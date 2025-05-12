@@ -57,3 +57,12 @@ if __name__ == "__main__":
     )
 
     console.print("Format only_carry_on (using Super Mapper)", only_carry_on)
+
+    # Top problems for TGS
+    console.print("Many baggages", sorted(passengers, key=lambda p: p["baggage"],reverse=True))
+
+    # Sort by seat
+    console.print("Seat ordered", sorted(passengers, key=lambda p: p["seat"]))
+
+    # Boarding status and name
+    console.print("Seat ordered", sorted(passengers, key=lambda p: (p["status"], p["name"])))
