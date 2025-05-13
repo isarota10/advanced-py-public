@@ -1,4 +1,28 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+
+from random import choice
+
+import time
+
+
+def timeit(fn: callable):
+    def wrapper(*args, **kwargs):
+        duration = []
+        for _ in range(3):
+            start = time.time()
+
+            result = fn(*args, **kwargs)
+
+            end = time.time()
+
+            duration.append(end - start)
+
+        print(f"Elapsed time: {sum(duration) / 3:.6f} for {fn.__name__}")
+
+        return result
+
+    return wrapper
+
 
 passengers = [
     {"name": "Alice", "seat": "12A", "status": "checked-in", "baggage": 2},
@@ -8,15 +32,26 @@ passengers = [
 ]
 
 
+def synetic_passengers(n: int = 1_000_000) -> Iterator[dict]:
+    for i in range(n):
+        yield dict(
+            status=choice(["cheked-in", "boarding", "not-checked-in"]),
+            baggage=choice([0, 1, 2]),
+            trip_id=f"UFCG-{i}",
+        )
+
+
+@timeit
 def hash_gby(data: Iterable[dict], column: str, metric="count"):
     bucket = {}
 
-    for p in passengers:
+    for p in data:
         bucket[p[column]] = bucket.get(p[column], 0) + 1
 
     return bucket
 
 
+@timeit
 def pipeline_gby(data: Iterable[dict], column: str, metric="count"):
     previous_key = None
     counter = 0
@@ -36,21 +71,31 @@ def pipeline_gby(data: Iterable[dict], column: str, metric="count"):
 
 
 if __name__ == "__main__":
-    result = hash_gby(passengers, "status", "count")
+    # result = hash_gby(passengers, "status", "count")
 
-    print("\nOutput HGBY 1")
+    # print("\nOutput HGBY 1")
 
-    for k, v in result.items():
-        print(k, v)
+    # for k, v in result.items():
+    #     print(k, v)
 
-    result = hash_gby(sorted(passengers, key=lambda x: x["status"]), "status", "count")
+    # result = hash_gby(sorted(passengers, key=lambda x: x["status"]), "status", "count")
 
-    print("\nOutput HGBY 2")
-    for k, v in result.items():
-        print(k, v)
+    # print("\nOutput HGBY 2")
+    # for k, v in result.items():
+    #     print(k, v)
 
-    result = pipeline_gby(sorted(passengers, key=lambda x: x["status"]), "status", "count")
+    # result = pipeline_gby(
+    #     sorted(passengers, key=lambda x: x["status"]), "status", "count"
+    # )
 
-    print("\nOutput PGBY 1")
-    for k, v in result:
-        print(k, v)
+    # print("\nOutput PGBY 1")
+    # for k, v in result:
+    #     print(k, v)
+
+    field = "trip_id"
+
+    data = sorted(synetic_passengers(1_000_000), key=lambda d: d[field])
+
+    result = hash_gby(data, field)
+
+    result = pipeline_gby(data, field)
