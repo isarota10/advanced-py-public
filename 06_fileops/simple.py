@@ -1,6 +1,7 @@
 from collections.abc import Iterator, Iterable
 from random import choice, randint
-
+from typing import Literal
+import gzip
 import json
 from pathlib import Path
 from itertools import tee, islice
@@ -13,6 +14,14 @@ def synetic_passengers(n: int = 1_000_000) -> Iterator[dict]:
             baggage=choice([0, 1, 2]),
             trip_id=f"UFCG-{i}",
         )
+
+
+"""
+Partitioning strategies
+ - Random       --> Input ? i n
+ - Round robin  --> Input ? i n
+ - By a key     --> Input ? which column i  n 
+"""
 
 
 class Random:
@@ -52,6 +61,8 @@ class partitioned:
             data: Iterable[dict],
             *,
             batch_size: int | None = None,
+            sort_key: tuple[str] | None = None,
+            compression: CompressionType | None = None,
         ):
             total_bytes, n_io_request = 0, 0
 
@@ -69,7 +80,11 @@ class partitioned:
 
             for i in range(self.partition_count):
                 part_bytes, part_io_request = fn_writer(
-                    directory / f"{i}.jsonl", partitions[i], batch_size=batch_size
+                    directory / f"{i}.jsonl",
+                    partitions[i],
+                    batch_size=batch_size,
+                    sort_key=sort_key,
+                    compression=compression,
                 )
                 total_bytes += part_bytes
                 n_io_request += part_io_request
@@ -82,47 +97,59 @@ class partitioned:
         return wrapper
 
 
-"""
-Partitioning strategies
- - Random       --> Input ? i n
- - Round robin  --> Input ? i n
- - By a key     --> Input ? which column i  n 
-"""
+CompressionType = Literal["gzip", "zstd", "snappy", "bz2"]
 
 
-#@partitioned(n=4, strategy=KeyBased("baggage","status"))
-#@partitioned(n=4, strategy=Random())
+# @partitioned(n=4, strategy=KeyBased("baggage","status"))
+# @partitioned(n=4, strategy=Random())
 @partitioned(n=4, strategy=KeyBased("trip_id"))
 def clever_write(
-    path_like: Path | str, data: Iterable[dict], *, batch_size: int | None = None
+    path_like: Path | str,
+    data: Iterable[dict],
+    *,
+    batch_size: int | None = None,
+    sort_key: tuple[str] | None = None,
+    compression: CompressionType | None = None,
 ) -> tuple[int, int]:
+    def smart_open(path: Path, compression: CompressionType):
+        if compression == "gzip":
+            return gzip.open(path, "wb",compresslevel=4)
+        else:
+            return path.open("wb")
+
     total_bytes, n_io_request = 0, 0
     if isinstance(path_like, str):
         path = Path(path_like)
     else:
         path = path_like
 
-    with path.open("w") as wp:
+    if sort_key:
+        processed = sorted(data, key=lambda e: tuple((e[k] for k in sort_key)))
+    else:
+        processed = data
+
+    with smart_open(path, compression) as wp:
         if batch_size:
             batch = []
-            for d in data:
+            for d in processed:
                 line = json.dumps(d)
 
                 batch.append(line)
                 total_bytes += len(line)
 
                 if len(batch) == batch_size:
-                    print("\n".join(batch), file=wp)
+                    #print("\n".join(batch), file=wp)
+                    wp.write("\n".join(batch).encode())
                     n_io_request += 1
                     batch = []
 
             if len(batch) > 0:
-                print("\n".join(batch), file=wp)
+                wp.write("\n".join(batch).encode())
                 n_io_request += 1
         else:
             for d in data:
                 line = json.dumps(d)
-                print(line, file=wp)
+                wp.write(line.encode())
 
                 total_bytes += len(line)
                 n_io_request += 1
@@ -139,8 +166,8 @@ if __name__ == "__main__":
         - [x] Write a segmented/partitioned json line file
         - [x] Random partitioning
         - [x] Key parittioning
-        - [] Write a segment/partitioned sorted json line file
-        - [] Compresssion        
+        - [x] Write a segment/partitioned sorted json line file
+        - [x] Compresssion        
         - [] Memory efficient version of same code
     """
 
@@ -175,7 +202,17 @@ if __name__ == "__main__":
     # print(f"Total of {byte_count} written in {n_io_request} requests")
 
     byte_count, n_io_request = clever_write(
-        output_dir / "passenger.m.jsonl", data_m, batch_size=100
+        output_dir / "passenger.m.jsonl", data_m_1, batch_size=100, compression="gzip"
+    )
+
+    print(f"Total of {byte_count} written in {n_io_request} requests")
+
+    byte_count, n_io_request = clever_write(
+        output_dir / "passenger.m.sorted.jsonl",
+        data_m_2,
+        batch_size=100,
+        sort_key=("trip_id",),
+        compression="gzip",
     )
 
     print(f"Total of {byte_count} written in {n_io_request} requests")
