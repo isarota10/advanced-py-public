@@ -2,7 +2,36 @@ from random import randint
 
 from rich.console import Console
 from collections.abc import Iterator
-from collections import defaultdict
+from math import sqrt
+
+
+def is_prime(n: int) -> bool:
+    if n <= 1:
+        return False
+    elif n == 2:
+        return True
+    else:
+        for d in range(2, int(sqrt(n))):
+            if n % d == 0:
+                return False
+
+        return True
+
+
+def prime_generator():
+    before, now = 2, 3
+
+    # yield before, now
+
+    while True:
+        if is_prime(now):
+            yield before, now
+
+            before = now
+
+        now += 2
+
+
 
 def mean(x: list[int]) -> float:
     total = sum(x)
@@ -22,31 +51,41 @@ def get_batch_data(n: int) -> list[int]:
 
 
 def streaming_stats(
-    fn_gen: list[callable], stats_per_n: int = 10_0000
+    stream: Iterator[float], stats_per_n: int = 10_0000
 ) -> Iterator[tuple[float, float, int]]:
-    total = defaultdict(int)
-    total2 = defaultdict(int)
-    counter = defaultdict(int)
+    total = 0.0
+    total2 = 0.0
+    counter = 0
 
-    while True:
-        segment = randint(0,1)
-        x = fn_gen[segment]()
+    for x in stream:
+        total += x
+        total2 += x**2
 
-        total[segment] += x
-        total2[segment] += x**2
+        counter += 1
 
-        counter[segment] += 1
+        if counter % stats_per_n == 0:
+            yield (
+                total / counter,
+                total2 / counter - (total / counter) ** 2,
+                counter,
+            )
 
-        if (counter[0] + counter[1])  % stats_per_n == 0:
-            for i in [0,1]:
-                yield i, total[i] / counter[i], total2[i] / counter[i] - (total[i] / counter[i]) ** 2, counter[i]
 
 if __name__ == "__main__":
-    #v = get_batch_data(100_000)
+    # v = get_batch_data(100_000)
 
     console = Console()
 
-    #console.print(f"Mean", mean(v), "Variance", variance(v))
+    # console.print(f"Mean", mean(v), "Variance", variance(v))
 
-    for segment, m, v, count in streaming_stats([lambda: randint(3, 6),lambda: randint(4, 8)], stats_per_n=1_000_000):
-        console.print("Customer Segment", segment,"Mean", m, "Variance", v, "at", count, "elements")
+
+    if False:
+        for ratio, now, before in (
+            (now / before, now, before) for before, now in prime_generator()
+        ):
+            console.print(f"Current", now, "Previous", before, "Ration", ratio)
+
+    for m, v, count in streaming_stats(
+        (now / before for before, now in prime_generator()), stats_per_n=1000
+    ):
+        console.print(f"Mean", m, "Variance", v)
