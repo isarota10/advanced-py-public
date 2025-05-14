@@ -90,3 +90,5 @@ class InMemoryPythonDB:
             raise BookExists(book.title)
 
         self.books[book_id] = book
+
+    def delete_book(self, book_id: int): ...
