@@ -66,10 +66,12 @@ class partitioned:
         ):
             total_bytes, n_io_request = 0, 0
 
-            partitions = [[] for _ in range(self.partition_count)]
+            # partitions = [[] for _ in range(self.partition_count)]
 
-            for i, e in enumerate(data):
-                partitions[self.partitioner(i, e, self.partition_count)].append(e)
+            replicas = tee(data, self.partition_count)
+
+            # for i, e in enumerate(data):
+            #    partitions[self.partitioner(i, e, self.partition_count)].append(e)
 
             if isinstance(path_like, str):
                 directory = Path(path_like)
@@ -81,7 +83,11 @@ class partitioned:
             for i in range(self.partition_count):
                 part_bytes, part_io_request = fn_writer(
                     directory / f"{i}.jsonl",
-                    partitions[i],
+                    (
+                        e
+                        for j, e in enumerate(replicas[i])
+                        if self.partitioner(j, e, self.partition_count) == i
+                    ),
                     batch_size=batch_size,
                     sort_key=sort_key,
                     compression=compression,
@@ -113,7 +119,7 @@ def clever_write(
 ) -> tuple[int, int]:
     def smart_open(path: Path, compression: CompressionType):
         if compression == "gzip":
-            return gzip.open(path, "wb",compresslevel=4)
+            return gzip.open(path, "wb", compresslevel=4)
         else:
             return path.open("wb")
 
@@ -138,7 +144,7 @@ def clever_write(
                 total_bytes += len(line)
 
                 if len(batch) == batch_size:
-                    #print("\n".join(batch), file=wp)
+                    # print("\n".join(batch), file=wp)
                     wp.write("\n".join(batch).encode())
                     n_io_request += 1
                     batch = []
@@ -147,7 +153,7 @@ def clever_write(
                 wp.write("\n".join(batch).encode())
                 n_io_request += 1
         else:
-            for d in data:
+            for d in processed:
                 line = json.dumps(d)
                 wp.write(line.encode())
 
@@ -212,7 +218,7 @@ if __name__ == "__main__":
         data_m_2,
         batch_size=100,
         sort_key=("trip_id",),
-        compression="gzip",
+        compression=None,
     )
 
     print(f"Total of {byte_count} written in {n_io_request} requests")
