@@ -1,10 +1,9 @@
 import random
 import time
+import math
 
-if __name__ == "__main__":
-    start = time.time()
 
-    # Simulate user data generation
+def gen_data(n: int = 75_000) -> list[dict]:
     users = []
     for i in range(75_000):
         user = {
@@ -15,39 +14,68 @@ if __name__ == "__main__":
         }
         users.append(user)
 
+    return user
 
+
+def is_prime(n: int) -> bool:
+    if n < 2:
+        return False
+
+    _is_prime = True
+    for i in range(2, n):
+        if n % i == 0:
+            _is_prime = False
+            break
+
+    return _is_prime
+
+
+if __name__ == "__main__":
+    start = time.time()
+
+    """
+        Ideas for optimization
+          - [ ] List comprehension
+          - 
+    """
+    users = gen_data(75_000)
+
+    """
+        Ideas for optimization
+          - [ ]
+    
+    """
     prime_users = []
     for user in users:
         n = user["id"]
-        if n < 2:
-            continue
-        is_prime = True
-        for i in range(2, n):
-            if n % i == 0:
-                is_prime = False
-                break
-        if is_prime:
+
+        if is_prime(n):
             prime_users.append(user)
 
-    import math
-
     # Complex and inefficient scoring logic
+    """
+        Ideas to optimize 
+          - [ ]
+    
+    """
     total_score = 0
     for user in prime_users:
         time.sleep(0.001)  # simulate model latency
 
-        score = 0
         name = user["email"].split("@")[0]  # pretend we're doing name-based scoring
         name_entropy = sum(ord(c) ** 1.5 for c in name)  # unnecessary power ops
-        behavior_factor = math.sin(user["score"] / 17) + math.log1p(
-            user["age"]
-        )  
+        behavior_factor = math.sin(user["score"] / 17) + math.log1p(user["age"])
         noise = sum([random.random() * 0.1 for _ in range(100)])  # artificial noise
-        
+
         score = name_entropy * behavior_factor + noise
         total_score += int(score)
 
     # Artificially slow sort and filter
+    """
+        Ideas to optimize 
+          - [ ]
+    
+    """
     sorted_emails = []
     sorted_users = sorted(prime_users, key=lambda u: u["score"], reverse=True)
     for user in sorted_users:
